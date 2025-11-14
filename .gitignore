@@ -6,6 +6,7 @@ __pycache__/
 .Python
 venv/
 env/
+.env
 ENV/
 *.egg-info/
 dist/
@@ -16,16 +17,18 @@ build/
 *.ipynb_checkpoints
 
 # Data files
-data/raw/*.json
-data/processed/*.csv
-data/processed/*.geojson
-data/predictions/*.csv
-data/predictions/*.json
+data/raw/**/*
+data/predictions/**/*
+data/processed/**/*
 
 # Keep directory structure
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/predictions/.gitkeep
+
+# Models
+models/**/*
+!models/.gitkeep
 
 # IDE
 .vscode/

@@ -1,0 +1,231 @@
+# Architecture du Projet - Version 3 (Modulaire)
+
+## 📋 Vue d'Ensemble
+
+Le projet a été réorganisé en architecture modulaire avec des scripts séparés par responsabilité.
+
+## 🗂️ Structure du Projet
+
+```
+CityZN/Simulation Python/
+├── data/
+│   ├── raw/                          # Données brutes collectées
+│   │   ├── bike/                     # Données vélo
+│   │   │   ├── bike_counters_*.json  # Comptages horaires (timestampés)
+│   │   │   ├── bike_sensors_metadata.json
+│   │   │   ├── bike_sensors.geojson
+│   │   │   ├── bike_infrastructure.json
+│   │   │   └── bike_infrastructure_simplified.geojson
+│   │   ├── osm/                      # Réseau routier
+│   │   │   └── osm_network.json
+│   │   └── weather/                  # Données météo
+│   │       ├── weather_data_*.json   # Météo horaire (timestampés)
+│   │       └── weather_daily_summary.json
+│   ├── processed/                    # Données preprocessées
+│   │   ├── final_dataset_v3.csv      # Dataset ML training
+│   │   └── edges_static_v3.gpkg      # Features edges (GeoPackage)
+│   └── predictions/                  # Prédictions du modèle
+│       ├── predictions_*.csv
+│       └── predictions_*.geojson
+├── src/
+│   ├── data_collection/              # 📥 Collecte de données
+│   │   ├── main_data_collection.py   # 🚀 Orchestrateur
+│   │   ├── fetch_bike_counters.py    # 🚴 Compteurs vélo
+│   │   ├── fetch_bike_infrastructure.py # 🛤️ Pistes cyclables
+│   │   ├── fetch_osm_network.py      # 🗺️ Réseau routier
+│   │   ├── fetch_weather.py          # 🌤️ Météo
+│   │   └── README.md
+│   ├── preprocessing/                # 🔧 Preprocessing
+│   │   ├── create_ml_dataset_v3.py   # Dataset ML
+│   │   └── README.md
+│   ├── models/                       # 🤖 Modèles ML
+│   │   ├── train_predict.py          # Entraînement + prédiction
+│   │   ├── predict_complete.py       # Prédiction complète
+│   │   ├── predict_gray_zones.py     # Prédiction zones grises
+│   │   ├── analyze_errors.py         # Analyse erreurs
+│   │   ├── create_complete_geojson.py
+│   │   └── csv_to_temporal_geojson.py
+│   └── visualization/                # 📊 Visualisation
+│       ├── create_visualizations.py
+│       ├── export_kepler.py
+│       └── export_kepler_geojson.py
+├── models/                           # 💾 Modèles entraînés
+│   ├── best_model.joblib
+│   ├── feature_columns.json
+│   ├── label_encoders.joblib
+│   └── metrics.json
+├── visualizations/                   # 📈 Visualisations générées
+└── run.sh                           # 🚀 Script de démarrage rapide
+```
+
+## 🔄 Workflow Complet
+
+### 1. Collecte de Données
+
+```bash
+# Collecte complète (toutes sources)
+python src/data_collection/main_data_collection.py
+
+# Ou individuellement
+python src/data_collection/fetch_osm_network.py
+python src/data_collection/fetch_bike_infrastructure.py
+python src/data_collection/fetch_bike_counters.py
+python src/data_collection/fetch_weather.py
+```
+
+**Sortie** : Fichiers JSON/GeoJSON dans `data/raw/`
+
+### 2. Preprocessing
+
+```bash
+python src/preprocessing/create_ml_dataset_v3.py
+```
+
+**Sortie** :
+- `data/processed/final_dataset_v3.csv` (dataset training)
+- `data/processed/edges_static_v3.gpkg` (features edges)
+
+### 3. Entraînement du Modèle
+
+```bash
+python src/models/train_predict.py train
+```
+
+**Sortie** :
+- `models/best_model.joblib`
+- `models/feature_columns.json`
+- `models/label_encoders.joblib`
+- `models/metrics.json`
+
+### 4. Prédictions
+
+```bash
+# Prédiction sur données de test
+python src/models/train_predict.py predict
+
+# Prédiction complète (tous les edges)
+python src/models/predict_complete.py
+
+# Prédiction zones grises uniquement
+python src/models/predict_gray_zones.py
+```
+
+**Sortie** : `data/predictions/predictions_*.csv` et `.geojson`
+
+### 5. Visualisation
+
+```bash
+# Export pour Kepler.gl
+python src/visualization/export_kepler.py
+
+# Créer visualisations complètes
+python src/visualization/create_visualizations.py
+```
+
+**Sortie** : `visualizations/*.html`, `.csv`, `.geojson`
+
+## 📊 Types de Données
+
+### Données Brutes
+
+| Source | Format | Fréquence | Timestamp |
+|--------|--------|-----------|-----------|
+| Compteurs vélo | JSON | Horaire | ✅ Oui |
+| Capteurs metadata | JSON | Unique | ❌ Non (mis à jour) |
+| Pistes cyclables | JSON/GeoJSON | Unique | ❌ Non (écrasé) |
+| Réseau OSM | JSON/GeoJSON | Unique | ❌ Non (écrasé) |
+| Météo | JSON | Horaire | ✅ Oui |
+
+### Données Processées
+
+| Fichier | Description | Format |
+|---------|-------------|--------|
+| `final_dataset_v3.csv` | Dataset training (~10k lignes) | CSV |
+| `edges_static_v3.gpkg` | Features edges (~60k edges) | GeoPackage |
+
+### Prédictions
+
+| Fichier | Description | Contenu |
+|---------|-------------|---------|
+| `predictions_complete_*.csv` | Prédictions tous edges | edge_id, timestamp, prediction |
+| `predictions_spatial_*.geojson` | Prédictions géospatialisées | LineString + prédictions |
+| `predictions_gray_zones_*.csv` | Prédictions zones sans capteurs | Edges non observés |
+
+## 🎯 Philosophie de l'Architecture
+
+### Séparation des Responsabilités
+
+1. **Collecte** (`data_collection/`) : Un script par source de données
+2. **Preprocessing** (`preprocessing/`) : Transformation raw → ML dataset
+3. **Modèles** (`models/`) : Training, prédiction, analyse
+4. **Visualisation** (`visualization/`) : Export et graphiques
+
+### Stratégie de Stockage
+
+- **Timestampé** : Données temporelles (météo, comptages)
+- **Écrasé** : Données structurelles (réseau, infrastructures)
+
+### Scope Training vs Prédiction
+
+- **Training** : Edges avec capteurs uniquement (~62 edges)
+- **Prédiction** : Tous les edges (~60k edges)
+
+## 🗑️ Fichiers Supprimés (Migration v3)
+
+### Data Collection
+- ❌ `fetch_lyon_data.py` (remplacé par scripts modulaires)
+
+### Preprocessing
+- ❌ `create_ml_dataset.py` (v1)
+- ❌ `create_ml_dataset_v2.py` (v2)
+- ❌ `create_traffic_patterns_from_realtime.py` (non utilisé)
+
+### Models
+- ❌ `predict_complete_BROKEN.py` (fichier cassé)
+
+## 📝 Conventions de Nommage
+
+### Fichiers Timestampés
+
+Format : `{nom}_{YYYYMMDD}_{HHMMSS}.{ext}`
+
+Exemple : `bike_counters_20251114_153042.json`
+
+### Versions
+
+Les fichiers avec version incluent le numéro : `final_dataset_v3.csv`
+
+### GeoJSON vs JSON
+
+- `.json` : Données tabulaires avec métadonnées
+- `.geojson` : Données géospatiales (GeoJSON standard)
+- `.gpkg` : Données géospatiales optimisées (GeoPackage)
+
+## 🚀 Quick Start
+
+```bash
+# 1. Tout collecter et traiter
+python src/data_collection/main_data_collection.py
+python src/preprocessing/create_ml_dataset_v3.py
+
+# 2. Entraîner
+python src/models/train_predict.py train
+
+# 3. Prédire
+python src/models/train_predict.py predict
+
+# 4. Visualiser
+python src/visualization/export_kepler.py
+```
+
+Ou utiliser le script de démarrage :
+
+```bash
+./run.sh
+```
+
+## 📚 Documentation
+
+- `src/data_collection/README.md` : Détails collecte de données
+- `src/preprocessing/README.md` : Détails preprocessing
+- Ce fichier : Vue d'ensemble architecture
