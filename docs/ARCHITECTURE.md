@@ -33,18 +33,13 @@ CityZN/Simulation Python/
 │   │   ├── fetch_bike_counters.py    # 🚴 Compteurs vélo
 │   │   ├── fetch_bike_infrastructure.py # 🛤️ Pistes cyclables
 │   │   ├── fetch_osm_network.py      # 🗺️ Réseau routier
-│   │   ├── fetch_weather.py          # 🌤️ Météo
-│   │   └── README.md
+│   │   └── fetch_weather.py          # 🌤️ Météo
 │   ├── preprocessing/                # 🔧 Preprocessing
-│   │   ├── create_ml_dataset_v3.py   # Dataset ML
-│   │   └── README.md
+│   │   └── create_ml_dataset_v3.py   # Dataset ML
 │   ├── models/                       # 🤖 Modèles ML
-│   │   ├── train_predict.py          # Entraînement + prédiction
-│   │   ├── predict_complete.py       # Prédiction complète
-│   │   ├── predict_gray_zones.py     # Prédiction zones grises
-│   │   ├── analyze_errors.py         # Analyse erreurs
-│   │   ├── create_complete_geojson.py
-│   │   └── csv_to_temporal_geojson.py
+│   │   ├── train_v3.py               # 🎓 Entraînement
+│   │   ├── predict_v3.py             # 🔮 Prédiction date/heure
+│   │   └── analyze_errors_v3.py      # 📊 Analyse erreurs
 │   └── visualization/                # 📊 Visualisation
 │       ├── create_visualizations.py
 │       ├── export_kepler.py
@@ -88,7 +83,7 @@ python src/preprocessing/create_ml_dataset_v3.py
 ### 3. Entraînement du Modèle
 
 ```bash
-python src/models/train_predict.py train
+python src/models/train_v3.py
 ```
 
 **Sortie** :
@@ -96,8 +91,48 @@ python src/models/train_predict.py train
 - `models/feature_columns.json`
 - `models/label_encoders.joblib`
 - `models/metrics.json`
+- `data/predictions/feature_importance.csv`
 
-### 4. Prédictions
+### 4. Prédiction pour Date/Heure Spécifique
+
+```bash
+# Prédire pour demain à 8h
+python src/models/predict_v3.py --datetime "2025-11-15 08:00"
+
+# Test rapide sur 1000 edges
+python src/models/predict_v3.py --datetime "2025-11-15 08:00" --sample 1000
+
+# Nom personnalisé
+python src/models/predict_v3.py --datetime "2025-11-15 17:30" --output rush_soir.csv
+```
+
+**Sortie** :
+- `data/predictions/predictions_YYYYMMDD_HHMMSS.csv`
+- `data/predictions/predictions_YYYYMMDD_HHMMSS.geojson`
+- `data/predictions/predictions_YYYYMMDD_HHMMSS_metadata.json`
+
+### 5. Analyse des Erreurs
+
+```bash
+python src/models/analyze_errors_v3.py
+```
+
+**Sortie** :
+- `visualizations/error_analysis_v3.png`
+- `visualizations/error_analysis_report_v3.txt`
+- `data/predictions/worst_predictions_v3.csv`
+
+## 🔧 Scripts Helper
+
+### Orchestrateur complet
+
+```bash
+./run_training.sh
+```
+
+Lance automatiquement : entraînement + analyse + prédiction exemple
+
+### 6. Prédictions (Anciennes versions - à migrer)
 
 ```bash
 # Prédiction sur données de test

@@ -44,44 +44,82 @@ Système de collecte, fusion et prédiction de données de trafic cycliste pour 
 
 ## 🔬 Méthodologie
 
-### 1. Collecte Modulaire
+### Architecture Modulaire v3
+
+Le projet suit une architecture modulaire en 4 étapes :
+
+### 1. Collecte de Données
 ```bash
 python src/data_collection/main_data_collection.py
 ```
-- Scripts séparés par source de données
-- Fichiers timestampés pour traçabilité
-- Métadonnées enrichies
+
+Scripts individuels disponibles :
+- `fetch_bike_counters.py` - Compteurs vélo (API Eco-Visio)
+- `fetch_bike_infrastructure.py` - Pistes cyclables (Grand Lyon)
+- `fetch_osm_network.py` - Réseau routier (Overpass API)
+- `fetch_weather.py` - Météo (Open-Meteo)
 
 ### 2. Preprocessing
 ```bash
 python src/preprocessing/create_ml_dataset_v3.py
 ```
-- Association spatiale capteurs → edges (rayon 50m)
-- Calcul features : géométrie, infrastructure, temporel
-- Dataset training : ~62 edges × 168 heures = ~10k lignes
 
-### 3. Entraînement
+Transforme les données brutes en dataset ML :
+- Association spatiale capteurs → edges (≤50m)
+- Enrichissement infrastructure (pistes cyclables, distance)
+- Features temporelles + météo + géométriques
+- Lag features (trafic historique)
+
+**Sortie** : 
+- `final_dataset_v3.csv` (~11k lignes, 68 edges avec capteurs)
+- `edges_static_v3.gpkg` (60k edges avec features)
+
+### 3. Entraînement ML
 ```bash
-python src/models/train_predict.py train
+python src/models/train_v3.py
 ```
-- Modèle : Random Forest / XGBoost
-- Features : temporel + météo + infrastructure
-- Target : bike_count (nombre de vélos/heure)
 
-### 4. Prédiction Zones Grises
+Compare 3 modèles (RandomForest, GradientBoosting, Ridge) et sélectionne le meilleur.
+
+**Performance actuelle** :
+- **R² = 0.873** (87% de variance expliquée)
+- **MAE = 28.5 vélos/h**
+- Top features : lag_1h (42%), rolling_7d (16%), lag_24h (14%)
+
+### 4. Prédiction pour Date/Heure Spécifique ⭐
 ```bash
-python src/models/predict_gray_zones.py
+# Prédire pour demain à 8h
+python src/models/predict_v3.py --datetime "2025-11-15 08:00"
+
+# Test rapide sur 1000 edges
+python src/models/predict_v3.py --datetime "2025-11-15 17:30" --sample 1000
 ```
-- Application du modèle sur les ~60k edges sans capteurs
-- Export GeoJSON pour visualisation
-- Quantification de l'incertitude
 
-## 📈 Résultats
+Prédit le trafic vélo sur **tous les 60k edges** pour n'importe quelle date/heure
 
-- ✅ **Training** : ~62 edges avec données réelles
-- 🔮 **Prédiction** : ~60k edges (zones grises)
-- 📊 **Métriques** : MAE, RMSE, R² sur données de validation
-- 🗺️ **Visualisation** : Export Kepler.gl interactif
+**Sorties** :
+- CSV avec prédictions + features
+- GeoJSON pour visualisation (QGIS, Kepler.gl)
+- Métadonnées JSON (météo, statistiques, contexte)
+
+## 📈 Résultats v3
+
+### Performance du Modèle
+- ✅ **R² = 0.873** (excellent)
+- ✅ **MAE = 28.5 vélos/h** (erreur moyenne absolue)
+- ✅ **RMSE = 59.7 vélos/h**
+
+### Couverture
+- 🎓 **Training** : 68 edges avec capteurs réels (~11k mesures)
+- 🔮 **Prédiction** : 60,566 edges du réseau complet de Lyon
+- 📊 **Features** : 27 features (temporelles, météo, infrastructure, historiques)
+
+### Top Features Importantes
+1. **bike_count_lag_1h** (42%) - Trafic 1h avant
+2. **bike_count_rolling_7d** (16%) - Moyenne 7 jours
+3. **bike_count_lag_24h** (14%) - Même heure veille
+4. **hour** (5%) - Heure de la journée
+5. **distance_to_center_km** (4%) - Distance au centre
 
 ## 🛠️ Installation et Utilisation
 
@@ -96,23 +134,57 @@ source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 ```
 
-### Utilisation Rapide
+### Utilisation Rapide - Pipeline Complet
 
 ```bash
-# 1. Collecter toutes les données
+# 1. Collecter les données (compteurs vélo, réseau OSM, pistes, météo)
 python src/data_collection/main_data_collection.py
 
-# 2. Créer le dataset ML
+# 2. Preprocessing (créer dataset ML)
 python src/preprocessing/create_ml_dataset_v3.py
 
 # 3. Entraîner le modèle
-python src/models/train_predict.py train
+python src/models/train_v3.py
 
-# 4. Faire des prédictions
-python src/models/train_predict.py predict
+# 4. Prédire pour une date/heure spécifique
+python src/models/predict_v3.py --datetime "2025-11-15 08:00"
+
+# 5. Analyser les erreurs (optionnel)
+python src/models/analyze_errors_v3.py
 ```
 
-**📖 Documentation complète** : Voir [docs/README.md](docs/README.md)
+### Scripts Helper
+
+```bash
+# Preprocessing avec validation
+./run_preprocessing.sh
+
+# Pipeline ML complet (entraînement + analyse + prédiction exemple)
+./run_training.sh
+```
+
+### Exemples de Prédiction
+
+```bash
+# Prédire demain matin 8h (rush hour)
+python src/models/predict_v3.py --datetime "2025-11-15 08:00"
+
+# Prédire vendredi soir 18h (rush hour)
+python src/models/predict_v3.py --datetime "2025-11-22 18:00"
+
+# Test rapide sur 1000 edges
+python src/models/predict_v3.py --datetime "2025-11-15 08:00" --sample 1000
+
+# Nom de fichier personnalisé
+python src/models/predict_v3.py --datetime "2025-11-15 17:30" --output rush_vendredi_soir.csv
+```
+
+**� Documentation complète** : Voir dossier [docs/](docs/)
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Architecture du projet v3
+- [DATA_COLLECTION.md](docs/DATA_COLLECTION.md) - Guide collecte de données
+- [PREPROCESSING.md](docs/PREPROCESSING.md) - Guide preprocessing
+- [ML_MODELS.md](docs/ML_MODELS.md) - Guide ML (entraînement, prédiction, analyse)
+- [MIGRATION_V3.md](docs/MIGRATION_V3.md) - Migration vers v3
 
 ## � Structure du Projet
 
@@ -136,21 +208,25 @@ python src/models/train_predict.py predict
 │   ├── processed/                 # Dataset ML
 │   └── predictions/               # Résultats prédictions
 ├── src/
-│   ├── data_collection/           # 📥 Scripts de collecte
-│   │   ├── main_data_collection.py
-│   │   ├── fetch_bike_counters.py
-│   │   ├── fetch_bike_infrastructure.py
-│   │   ├── fetch_osm_network.py
-│   │   └── fetch_weather.py
+│   ├── data_collection/           # 📥 Collecte modulaire
+│   │   ├── main_data_collection.py      # Orchestrateur
+│   │   ├── fetch_bike_counters.py       # Compteurs vélo
+│   │   ├── fetch_bike_infrastructure.py # Pistes cyclables
+│   │   ├── fetch_osm_network.py         # Réseau OSM
+│   │   └── fetch_weather.py             # Météo
 │   ├── preprocessing/             # 🔧 Preprocessing
 │   │   └── create_ml_dataset_v3.py
-│   ├── models/                    # 🤖 ML models
-│   │   ├── train_predict.py
-│   │   ├── predict_complete.py
-│   │   └── predict_gray_zones.py
+│   ├── models/                    # 🤖 ML v3
+│   │   ├── train_v3.py            # Entraînement
+│   │   ├── predict_v3.py          # Prédiction date/heure
+│   │   └── analyze_errors_v3.py   # Analyse erreurs
 │   └── visualization/             # 📊 Visualisation
 │       └── export_kepler.py
 ├── models/                        # 💾 Modèles entraînés
+│   ├── best_model.joblib          # RandomForest (R²=0.873)
+│   ├── feature_columns.json       # 27 features
+│   ├── label_encoders.joblib
+│   └── metrics.json
 └── visualizations/                # 📈 Outputs visuels
 ```
 
